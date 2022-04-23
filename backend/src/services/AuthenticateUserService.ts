@@ -1,4 +1,6 @@
 import axios from "axios";
+import prismaClient from "../prisma";
+import { sign } from "jsonwebtoken";
 
 /* As interfaces definem quais campos são utilizados na aplicação */
 interface IAccessTokenResponse {
@@ -29,11 +31,49 @@ class AuthenticateUserService {
     })
 
     const response = await axios.get<IUserResponse>("https://api.github.com/user", {
+      /* É possível ver que é do tipo Bearer através do Insomnia */
       headers: {
         authorization: `Bearer ${accessTokenResponse.access_token}`
       }
     })
-    return response.data;
+
+    const { login, id, avatar_url, name } = response.data
+
+    const user = await prismaClient.user.findFirst({
+      /* Busca no banco um usuário com o id igual ao recebido */
+      where: {
+        github_id: id
+      }
+    })
+    /* Se o usuário não for encontrado, significa que não existe e portanto é criado um novo */
+    if (!user) {
+      await prismaClient.user.create({
+        /* data define os campos a serem salvos */
+        data: {
+          github_id: id,
+          name, /* Como é o mesmo nome, não precisa atribuir */
+          avatar_url,
+          login
+        }
+      })
+    }
+
+    const token = sign(
+      {
+        user: {
+          name: user.name,
+          avatar_url: user.avatar_url,
+          id: user.id
+        }
+      },
+      process.env.JWT_SECRET,
+      {
+        subject: user.id,
+        expiresIn: "1d"
+      }
+    );
+
+    return { token, user };
   }
 }
 
