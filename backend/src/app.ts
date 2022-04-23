@@ -1,9 +1,25 @@
 import "dotenv/config"; /* Faz a aplicação acessar o conteúdo das variáveis em env */
 import express from "express";
+import http from "http";
+import cors from "cors";
+import { Server } from "socket.io";
 
 import { router } from "./routes";
 
 const app = express();
+app.use(cors())
+
+const serverHttp = http.createServer(app);
+
+const io = new Server(serverHttp, {
+  cors: { /* Especifica as fontes que são conectadas com o servidor */
+    origin: "*"
+  }
+});
+
+io.on("connection", socket => {
+  console.log(`Usuário conectado no socket: ${socket.id}`);
+})
 
 app.use(express.json()); /* Especifica que pode receber tipo json */
 
@@ -23,7 +39,4 @@ app.get("/signin/callback", (request, response) => {
   return response.json(code);
 });
 
-/* O número corresponde a porte onde a aplicação irá rodar */
-app.listen(4000, () => console.log('Server is running on PORT 4000'));
-
-/* Por padrão o node não entende arquivos ts, então é feito um script no package.json que roda a aplicação com ts-node-dev */
+export { serverHttp, io }
